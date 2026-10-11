@@ -1,0 +1,38 @@
+{
+  "name": "dd-board",
+  "version": "0.1.0",
+  "description": "Differential-diagnosis protocol for coding agents: force root-cause hypotheses, cheap discriminating probes, and treatment authorization before any fix.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SuperMarioYL/dd-board.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SuperMarioYL/dd-board/issues"
+  },
+  "homepage": "https://github.com/SuperMarioYL/dd-board#readme",
+  "bin": {
+    "ddboard": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "protocol"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "node --test",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}
