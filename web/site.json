@@ -1,0 +1,293 @@
+{
+  "schema": 3,
+  "name": "dd-board",
+  "github": "https://github.com/SuperMarioYL/dd-board",
+  "lang": {
+    "primary": "zh",
+    "toggle": true
+  },
+  "palette": "auto",
+  "hero": {
+    "eyebrow": {
+      "zh": "面向 Coding Agent 的鉴别诊断协议层",
+      "en": "The differential-diagnosis protocol layer for coding agents"
+    },
+    "headline": {
+      "zh": "先诊断，后治疗。\n根因必须是验证出来的。",
+      "en": "Diagnose before you treat.\nNo fix without a verified root cause."
+    },
+    "sub": {
+      "zh": "DD-Board 强制 agent 动手修复前先给出 top-N 根因假设，每条绑定一条最廉价的区分性探针——先跑探针拿到 verdict，再申请治疗授权；跑不出探针的假设自动降级为「未验证猜测」。协议引擎模型无关：你自带 agent，DD-Board 只持有协议状态机、治疗授权门与静态诊断板。",
+      "en": "DD-Board forces the agent to produce top-N competing root-cause hypotheses before any fix, each bound to the cheapest discriminating probe it can — probes run first, only then is treatment authorized, and a hypothesis that cannot carry a probe is downgraded to an unverified guess. The protocol engine is model-agnostic: you bring the agent, DD-Board holds the protocol state machine, the treatment gate, and the static diagnosis board."
+    },
+    "href": "#quickstart",
+    "command": "npm i -g dd-board"
+  },
+  "advantages": [
+    {
+      "title": {
+        "zh": "治疗授权门：未验证，不放行",
+        "en": "The treatment gate: no verification, no fix"
+      },
+      "body": {
+        "zh": "主流 agent 循环把诊断和治疗合并成一个隐式动作——接到 Bug 直接改代码，改一版跑一遍失败再改一版。DD-Board 把这一步放进 MCP 工具层：只要还存在 untested 假设，request_treatment 直接被拒并返回缺口清单。prompt 里写「先诊断」是约定，协议拒绝才是强制。",
+        "en": "Mainstream agent loops merge diagnosis and treatment into one implicit action — the agent starts editing code immediately, then edit-run-fail loops. DD-Board moves that step into the MCP tool layer: while any hypothesis is untested, request_treatment is refused with the gap list. \"Diagnose first\" in a prompt is an agreement; a protocol that refuses is enforcement."
+      },
+      "chips": ["› INV-1", "› 拒绝时返回 untested 缺口清单"]
+    },
+    {
+      "title": {
+        "zh": "假设 ⇄ 区分性探针，强制绑定",
+        "en": "Hypotheses bound to discriminating probes"
+      },
+      "body": {
+        "zh": "动手修复前必须提交 top-N 相互竞争的根因假设（默认 N=3，协议最少 2 条），每条绑定最廉价的区分性探针——一条结果可机器判定的命令或测试。判定不依赖任何模型输出：verdict 由探针的退出码或输出匹配得出，与 exitCode、durationMs、时间戳一起落盘。",
+        "en": "Before any fix, the agent must submit top-N competing root-cause hypotheses (default N=3, minimum 2), each bound to the cheapest discriminating probe it can — a command or test whose outcome is machine-judgeable. Verdicts never depend on model output: they come from the probe's exit code or output match, persisted with exitCode, durationMs, and a timestamp."
+      },
+      "chips": ["› probe{cmd, expect}", "› 判定 + 耗时 + 证据落盘"]
+    },
+    {
+      "title": {
+        "zh": "猜测显式降级，不冒充事实",
+        "en": "Guesses downgraded on the record"
+      },
+      "body": {
+        "zh": "绑不出探针的假设自动降级为 downgraded-guess（INV-2）——猜测就是猜测：退出授权门检查，但作为留痕保留在会话与诊断板中，不允许留在上下文里冒充已验证事实。",
+        "en": "A hypothesis that cannot carry a probe is downgraded to downgraded-guess (INV-2) — a guess is a guess: it leaves the gate check, stays on the record in the session and the board, and never poses as a verified fact in context."
+      },
+      "chips": ["› INV-2", "› downgraded-guess 留痕"]
+    },
+    {
+      "title": {
+        "zh": "会话即审计留痕，诊断板可复盘",
+        "en": "The session is the audit trail"
+      },
+      "body": {
+        "zh": "会话文件 .ddboard/session.json 是单一事实源——纯 JSON、git 友好，留痕口径为判定级 + 证据级。ddboard render 把它渲染成静态诊断板 board.md / board.html：假设卡、探针结果（命令、判定、耗时）与被排除分支的完整留痕。两个进程，无服务、无数据库。",
+        "en": "The session file .ddboard/session.json is the single source of truth — plain JSON, git-friendly, with verdict-level plus evidence-level audit trails. ddboard render turns it into the static board board.md / board.html: hypothesis cards, probe results (command, verdict, duration), and the complete trail of refuted branches. Two processes, no server, no database."
+      },
+      "chips": ["› board.md / board.html", "› 无服务 · 无数据库"]
+    }
+  ],
+  "demo": {
+    "title": {
+      "zh": "真实命令，真实输出",
+      "en": "Real commands, real output"
+    },
+    "note": {
+      "zh": "以下命令与输出取自 dd-board v0.1.0 的实际运行；示例会话使用合成 bug 数据。完整流程 transcript 见仓库 assets/demo-script.md。",
+      "en": "The commands and output below come from actual runs of dd-board v0.1.0; the example session uses a synthetic bug. A full walkthrough transcript ships at assets/demo-script.md."
+    },
+    "source": "https://github.com/SuperMarioYL/dd-board",
+    "steps": [
+      {
+        "label": {
+          "zh": "初始化会话",
+          "en": "Initialize the session"
+        },
+        "body": {
+          "zh": "ddboard init 生成 .ddboard/session.json 会话模板（单一事实源，纯 JSON、git 友好），并打印如下 MCP 配置片段。",
+          "en": "ddboard init creates the .ddboard/session.json session template (single source of truth, plain JSON, git-friendly) and prints this MCP config snippet."
+        },
+        "command": "node dist/cli.js init",
+        "output": "{\n  \"mcpServers\": {\n    \"dd-board\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"dd-board\", \"mcp\"]\n    }\n  }\n}",
+        "image": "/assets/demo-init.svg"
+      },
+      {
+        "label": {
+          "zh": "授权门当场拒绝抢跑",
+          "en": "The gate refuses the premature fix"
+        },
+        "body": {
+          "zh": "假设还没验证，agent 直接申请治疗——授权门当场拒绝，并点名每一条缺口。",
+          "en": "The agent jumps to a fix while hypotheses are untested — the gate refuses on the spot and names every gap."
+        },
+        "command": "agent → dd-board: request_treatment { summary: \"直接改缓存翻新顺序，先发版\" }",
+        "output": "dd-board → agent:\n治疗授权被拒绝（INV-1）：存在 2 条 untested 假设——h-1、h-2\n先对每条假设 record_probe_result 拿到 confirmed/refuted，绑不出探针的用 downgrade_hypothesis 降级，再重新申请治疗。",
+        "image": "/assets/demo-gate.svg"
+      },
+      {
+        "label": {
+          "zh": "校验一个完整会话",
+          "en": "Validate a complete session"
+        },
+        "body": {
+          "zh": "示例会话（合成 bug）包含 3 条假设：1 confirmed / 1 refuted / 1 downgraded-guess / 0 untested，通过协议校验。",
+          "en": "The example session (a synthetic bug) holds 3 hypotheses: 1 confirmed / 1 refuted / 1 downgraded-guess / 0 untested, and passes the protocol validation."
+        },
+        "command": "node dist/cli.js validate examples/session.example.json",
+        "output": "OK: examples/session.example.json 通过协议校验",
+        "image": "/assets/demo-validate.svg"
+      },
+      {
+        "label": {
+          "zh": "渲染静态诊断板",
+          "en": "Render the diagnosis board"
+        },
+        "body": {
+          "zh": "ddboard render 读会话文件，在当前目录产出 board.md / board.html：假设卡、探针结果与被排除分支的完整留痕。",
+          "en": "ddboard render reads the session file and writes board.md / board.html into the current directory: hypothesis cards, probe results, and the complete refuted-branch trail."
+        },
+        "command": "node dist/cli.js render",
+        "output": "board.md\nboard.html",
+        "image": "/assets/demo-render.svg"
+      }
+    ]
+  },
+  "quickstart": {
+    "title": {
+      "zh": "从安装到第一张诊断板，目标 10 分钟以内",
+      "en": "From install to your first diagnosis board in under 10 minutes"
+    },
+    "body": {
+      "zh": "前置：Node.js >= 22 与任意支持 MCP 的 coding agent host（Claude Code、Cline 等）。把 init 打印的片段粘进所在 host 的 MCP 配置文件——Claude Code 用项目级 .mcp.json（或 ~/.claude.json 根级 mcpServers），Cline 用 ~/.cline/data/settings/cline_mcp_settings.json——重启会话即可。",
+      "en": "Prerequisites: Node.js >= 22 and any MCP-capable coding agent host (Claude Code, Cline, etc). Paste the snippet printed by init into your host's MCP config file — project-level .mcp.json or root-level mcpServers in ~/.claude.json for Claude Code, ~/.cline/data/settings/cline_mcp_settings.json for Cline — and restart the session."
+    },
+    "steps": [
+      {
+        "title": {
+          "zh": "安装",
+          "en": "Install"
+        },
+        "code": "npm i -g dd-board\n# 或免安装直跑：npx -y dd-board <命令>"
+      },
+      {
+        "title": {
+          "zh": "初始化会话",
+          "en": "Initialize a session"
+        },
+        "code": "cd your-project\nddboard init"
+      },
+      {
+        "title": {
+          "zh": "接入你的 coding agent",
+          "en": "Wire in your coding agent"
+        },
+        "code": "{\n  \"mcpServers\": {\n    \"dd-board\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"dd-board\", \"mcp\"]\n    }\n  }\n}"
+      },
+      {
+        "title": {
+          "zh": "抛一个真实 Bug 给 agent",
+          "en": "Hand the agent a real bug"
+        },
+        "code": "# 协议强制 agent 自主走完全流程，你只需等待：\n# propose_hypotheses（≥2 条假设，各绑探针）\n# → record_probe_result（逐条落盘判定）\n# → request_treatment（存在 untested 假设即被拒）\n# 授权放行后才动手修复"
+      },
+      {
+        "title": {
+          "zh": "渲染诊断板",
+          "en": "Render the board"
+        },
+        "code": "ddboard render    # 读 .ddboard/session.json，产出 board.md / board.html"
+      }
+    ]
+  },
+  "limitations": [
+    {
+      "zh": "v0.1 只渲染静态诊断板（board.md / board.html）——没有实时 Web 看板，也不做任何服务端托管。",
+      "en": "v0.1 renders static boards only (board.md / board.html) — no live web board and no server-side hosting."
+    },
+    {
+      "zh": "不做自动根因分析、不内置任何模型——协议引擎模型无关，agent 由用户自带。",
+      "en": "No automatic root-cause analysis and no built-in models — the protocol engine is model-agnostic and you bring the agent."
+    },
+    {
+      "zh": "探针由 agent 在 host 侧执行并回报结果；运行时要求 Node.js >= 22。",
+      "en": "Probes are executed and reported by the agent on the host side; requires Node.js >= 22."
+    },
+    {
+      "zh": "演示与示例会话使用合成 bug 数据；「可审计留痕」的口径为判定级 + 证据级（verdict 与 exitCode / durationMs / 时间戳 / 可选输出片段）。",
+      "en": "The demo and example session use a synthetic bug; the audit trail is verdict-level plus evidence-level (verdict with exitCode / durationMs / timestamp / optional output snippet)."
+    }
+  ],
+  "scene": {
+    "kind": "neon-graph",
+    "fallback": "/assets/scene-dark.svg",
+    "fallbackLight": "/assets/scene-light.svg"
+  },
+  "story": {
+    "intro": {
+      "title": {
+        "zh": "最贵的浪费，是没诊断就动手",
+        "en": "The most expensive waste is fixing without diagnosing"
+      },
+      "body": {
+        "zh": "Coding Agent 修 Bug 最贵的浪费，是 Agent 从不确立根因就连环试错——改一版、跑一遍、失败、再改一版，烧完预算回到起点，甚至提前宣布「修完了」。这不是个例：Cockroach Labs 公开记录了连续五个月「把 Bug 当病人、让 agent 先鉴别诊断再治疗」的实践，mtlynch 也独立记录了 agent 的乱试与过早宣布完成。机制在于：主流 agent 循环里，猜测与已验证事实在上下文中无法区分，后续修复全部建立在未验证前提上。",
+        "en": "The most expensive waste in agent-driven bug fixing is an agent that never establishes a root cause and simply retries in circles until the budget burns out — sometimes even declaring \"fixed\" prematurely. This is not anecdotal: Cockroach Labs publicly documented five months of treating bugs like patients, making agents diagnose before treating, and mtlynch independently recorded the same circling and premature completion. The mechanism: in mainstream agent loops, guesses and verified facts are indistinguishable in context, so every fix is built on unverified premises."
+      }
+    },
+    "sections": [
+      {
+        "title": {
+          "zh": "先跑探针，再谈治疗",
+          "en": "Probes first, treatment second"
+        },
+        "body": {
+          "zh": "协议把诊断和治疗在流程上分开：agent 必须先 propose_hypotheses 提交 top-N 根因假设，每条绑定最廉价的区分性探针；record_probe_result 逐条落盘 verdict 与证据（exitCode、durationMs、时间戳）；request_treatment 只在全部假设 confirmed/refuted 或显式降级后才放行。会话文件 .ddboard/session.json 是单一事实源，两个进程，无服务、无数据库。",
+          "en": "The protocol separates diagnosis from treatment: the agent must first propose_hypotheses with top-N root-cause hypotheses, each bound to its cheapest discriminating probe; record_probe_result persists each verdict with its evidence (exitCode, durationMs, timestamp); request_treatment opens only after every hypothesis is confirmed/refuted or explicitly downgraded. The session file .ddboard/session.json is the single source of truth — two processes, no server, no database."
+        },
+        "image": {
+          "light": "/assets/process-light.svg",
+          "dark": "/assets/process-dark.svg",
+          "alt": {
+            "zh": "协议状态机：start_session → propose_hypotheses → record_probe_result / downgrade_hypothesis → request_treatment",
+            "en": "Protocol state machine: start_session → propose_hypotheses → record_probe_result / downgrade_hypothesis → request_treatment"
+          }
+        }
+      },
+      {
+        "title": {
+          "zh": "治疗授权门当场拒绝抢跑",
+          "en": "The gate refuses premature fixes on the spot"
+        },
+        "body": {
+          "zh": "假设还没验证，agent 抢跑治疗？授权门当场拒绝并点名缺口：「治疗授权被拒绝（INV-1）：存在 2 条 untested 假设——h-1、h-2」。绑不出探针的假设由 INV-2 自动降级为 downgraded-guess，退出授权门检查但完整留痕。补齐判定后重新申请，授权放行——被排除的分支与降级猜测在诊断板上全程可查。",
+          "en": "The agent jumps to a fix while hypotheses are untested? The gate refuses on the spot and names the gaps: \"治疗授权被拒绝（INV-1）：存在 2 条 untested 假设——h-1、h-2\" (treatment authorization refused under INV-1: 2 untested hypotheses — h-1, h-2). A hypothesis without a runnable probe is downgraded by INV-2 to downgraded-guess — out of the gate check, on the record. Once verdicts are in and treatment is re-requested, the gate opens — and every refuted branch and downgraded guess stays inspectable on the board."
+        },
+        "image": {
+          "light": "/assets/gate-light.svg",
+          "dark": "/assets/gate-dark.svg",
+          "alt": {
+            "zh": "治疗授权门：untested 假设未清零前拒绝放行，downgraded-guess 显式绕行",
+            "en": "Treatment gate: refused while untested hypotheses remain; downgraded-guess bypasses explicitly"
+          }
+        }
+      }
+    ],
+    "details": [
+      {
+        "title": {
+          "zh": "接入任意 MCP host",
+          "en": "Wire in any MCP host"
+        },
+        "body": {
+          "zh": "ddboard init 打印 MCP 配置片段，粘进 host 配置文件重启会话即可：Claude Code 用项目级 .mcp.json（或 ~/.claude.json 根级 mcpServers），Cline 用 ~/.cline/data/settings/cline_mcp_settings.json。MCP server 以 stdio 运行，由 host 拉起。",
+          "en": "ddboard init prints an MCP config snippet — paste it into your host's config file and restart: project-level .mcp.json or root-level mcpServers in ~/.claude.json for Claude Code, ~/.cline/data/settings/cline_mcp_settings.json for Cline. The MCP server runs over stdio, spawned by the host."
+        },
+        "code": "{\n  \"mcpServers\": {\n    \"dd-board\": {\n      \"command\": \"npx\",\n      \"args\": [\"-y\", \"dd-board\", \"mcp\"]\n    }\n  }\n}"
+      },
+      {
+        "title": {
+          "zh": "约定优于配置",
+          "en": "Convention over configuration"
+        },
+        "body": {
+          "zh": "没有配置文件：会话文件固定在项目根的 .ddboard/session.json，ddboard render 把 board.md / board.html 写到当前目录。探针判定语义：expect 为 exit code N 时按退出码判定，否则按输出片段包含判定——探针的结论必须机器可判定。运行时要求 Node.js >= 22。",
+          "en": "There is no config file: the session lives at .ddboard/session.json in the project root, and ddboard render writes board.md / board.html into the current directory. Probe judging semantics: an expect of \"exit code N\" is judged by exit code, anything else by substring containment in the output snippet — probe conclusions must be machine-judgeable. Requires Node.js >= 22."
+        },
+        "code": "// .ddboard/session.json（单一事实源）\n{\n  \"bug\": { \"title\": \"…\", \"repro\": \"…\" },\n  \"hypotheses\": [\n    {\n      \"id\": \"h-1\",\n      \"statement\": \"根因假设陈述\",\n      \"probe\": { \"cmd\": \"…\", \"expect\": \"exit code 0\" },\n      \"status\": \"probeable\",\n      \"verdict\": \"confirmed\",\n      \"result\": { \"exitCode\": 0, \"durationMs\": 42, \"at\": \"…\" }\n    }\n  ],\n  \"treatmentAuthorizedAt\": null\n}"
+      }
+    ]
+  },
+  "footer": {
+    "tag": {
+      "zh": "先诊断，后治疗——每一次修复都回溯到已验证的根因。",
+      "en": "Diagnose before you treat — every fix traces back to a verified root cause."
+    }
+  },
+  "meta": {
+    "content_version": "1",
+    "source_version": "v0.1.0",
+    "visual_profile": "neon-particle",
+    "web_factory_ref": "03e7ec8a416f868b847d13b3023bf7d1215db767"
+  }
+}

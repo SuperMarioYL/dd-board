@@ -1,0 +1,38 @@
+{
+  "mode": "auto",
+  "id": "e65671-e7966a-f6acd5-b4b01fb6a1d0",
+  "identity": "https://github.com/supermarioyl/dd-board",
+  "primary": "#e65671",
+  "secondary": "#e7966a",
+  "highlight": "#f6acd5",
+  "dark": {
+    "bg": "#0a070e",
+    "panel": "#131019",
+    "code": "#140d15",
+    "ink": "#fdeef7",
+    "muted": "#b29cad",
+    "line": "#3a1824",
+    "primary": "#e65671",
+    "secondary": "#e7966a",
+    "highlight": "#f6acd5",
+    "accent": "#e65671",
+    "buttonStart": "#c84b63",
+    "buttonEnd": "#a2694b",
+    "buttonText": "#ffffff"
+  },
+  "light": {
+    "bg": "#fef9fa",
+    "panel": "#fef7f8",
+    "code": "#fdf3f5",
+    "ink": "#27161f",
+    "muted": "#725e70",
+    "line": "#f7cbd4",
+    "primary": "#bf475e",
+    "secondary": "#9a6447",
+    "highlight": "#8f647c",
+    "accent": "#bf475e",
+    "buttonStart": "#c84b63",
+    "buttonEnd": "#a2694b",
+    "buttonText": "#ffffff"
+  }
+}
