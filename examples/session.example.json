@@ -1,0 +1,49 @@
+{
+  "bug": {
+    "title": "商品详情页偶发返回价格翻新前的旧价格",
+    "repro": "对同一商品并发触发价格翻新与详情读取：node scripts/repro/price-cache-race.ts --iterations 200，约 5% 的响应携带翻新前的缓存价格"
+  },
+  "hypotheses": [
+    {
+      "id": "h-1",
+      "statement": "缓存翻新采用「先删后写」，并发读在删除窗口命中旧副本",
+      "probe": {
+        "cmd": "node scripts/repro/price-cache-race.ts --iterations 200 --assert-refresh-order",
+        "expect": "stale price read during refresh"
+      },
+      "status": "probeable",
+      "verdict": "confirmed",
+      "result": {
+        "exitCode": 1,
+        "durationMs": 4123,
+        "at": "2026-10-12T08:41:07.000Z",
+        "outputSnippet": "AssertionError: expected refreshed price after delete, got stale price read during refresh (198/200 iterations)"
+      }
+    },
+    {
+      "id": "h-2",
+      "statement": "Redis 连接池耗尽导致详情接口回退到进程内旧缓存",
+      "probe": {
+        "cmd": "node scripts/repro/price-cache-redis-pool.ts --pool-size 1 --fail-on-fallback",
+        "expect": "exit code 0"
+      },
+      "status": "probeable",
+      "verdict": "refuted",
+      "result": {
+        "exitCode": 1,
+        "durationMs": 2876,
+        "at": "2026-10-12T08:47:33.000Z",
+        "outputSnippet": "redis pool exhausted under load, but in-process fallback never triggered; 0/200 responses served from stale local cache"
+      }
+    },
+    {
+      "id": "h-3",
+      "statement": "上游价格服务在发布窗口写入了脏数据（上游访问日志已滚动过期，无法用一条廉价命令区分）",
+      "probe": null,
+      "status": "unprobeable",
+      "verdict": "downgraded-guess",
+      "result": null
+    }
+  ],
+  "treatmentAuthorizedAt": "2026-10-12T09:05:12.000Z"
+}

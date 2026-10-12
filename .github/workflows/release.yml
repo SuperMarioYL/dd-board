@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+
+permissions:
+  contents: write
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Verify tag matches package.json version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "tag $GITHUB_REF_NAME does not match package.json v$VERSION"
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm run build
+      - name: Pack npm tarball and checksums
+        run: |
+          mkdir -p .release
+          npm pack --pack-destination .release
+          cd .release
+          shasum -a 256 *.tgz > checksums.txt
+      - name: Attach artifacts to the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            .release/*.tgz
+            .release/checksums.txt
+
+  # Opt-in: set the NPM_PUBLISH repository variable to "true" and add the
+  # NPM_TOKEN secret once the package should ship to the npm registry.
+  npm-publish:
+    if: vars.NPM_PUBLISH == 'true'
+    needs: pack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          registry-url: https://registry.npmjs.org
+      - run: npm ci
+      - run: npm run build
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
